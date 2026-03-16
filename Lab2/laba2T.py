@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import time
 import random
 from sklearn.cluster import KMeans
-
+from sklearn.datasets import make_blobs
 
 
 # Вспомогательные функции
@@ -257,14 +257,20 @@ def main():
             'name': 'Тест 9 (чёрный ящик): Один выброс',
             'cities': [(0, 0)] * 8 + [(100, 100)],
             'K': 2
+        },
+        {
+            'name': 'Тест 10 (для метода локтя): Три сгенерированных кластера',
+            'cities': [tuple(pt) for pt in make_blobs(n_samples=100, centers=3, cluster_std=1.5, random_state=42)[0]],
+            'K': 3
         }
+
     ]
 
     # Последовательно выполняем все тесты
     for test in tests:
         run_test(test['cities'], test['K'], test['name'])
-    print("\nДемонстрация метода локтя для набора 'Тест 1'")
-    elbow_method(tests[0]['cities'], max_K=10)
+    print("\nДемонстрация метода локтя для набора 'Тест 10'")
+    elbow_method(tests[-1]['cities'], max_K=10)
 
 
 def elbow_method(cities, max_K=10):
