@@ -296,5 +296,4 @@ if __name__ == "__main__":
     # Фиксируем seed для воспроизводимости
     random.seed(42)
     np.random.seed(42)
-
     main()
