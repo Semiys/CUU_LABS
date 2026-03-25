@@ -10,10 +10,10 @@ from sklearn.datasets import make_blobs
 def generate_random_cities(n, x_range=(0, 100), y_range=(0, 100)):
     """Генерирует n случайных городов в заданных пределах."""
     return [(random.uniform(*x_range), random.uniform(*y_range)) for _ in range(n)]
+
 def distance(p1, p2):
     """Евклидово расстояние между двумя точками."""
     return np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
-
 
 def compute_wcss(cities, labels, centroids):
     """Сумма квадратов расстояний от точек до центроидов их кластеров."""
@@ -25,9 +25,7 @@ def compute_wcss(cities, labels, centroids):
     return wcss
 
 
-
 # Алгоритмы кластеризации
-
 def algorithmic_clustering(cities, K):
     """
     Детерминированный алгоритм, не похожий на K-средних:
@@ -35,36 +33,29 @@ def algorithmic_clustering(cities, K):
     2. Последующие центроиды выбираются как точки, максимально удалённые
        от уже выбранных центроидов (принцип максимального минимума).
     3. После выбора всех K центроидов – однократное распределение.
-    Возвращает метки кластеров и массив центроидов.
     """
     if K <= 0 or not cities:
         return np.array([]), np.array([])
 
     cities_list = list(cities)
-    # Шаг 1: первый центроид
     centroids = [cities_list[0]]
 
-    # Шаг 2: выбираем оставшиеся K-1 центроидов
     for _ in range(1, K):
         max_min_dist = -1
         best_point = None
         for point in cities_list:
-            # Пропускаем уже выбранные центроиды
             if any(np.array_equal(point, c) for c in centroids):
                 continue
-            # Расстояние до ближайшего центроида
             min_dist = min(distance(point, c) for c in centroids)
             if min_dist > max_min_dist:
                 max_min_dist = min_dist
                 best_point = point
         if best_point is None:
-            # Не осталось точек для выбора (все стали центроидами)
             break
         centroids.append(best_point)
 
     centroids = np.array(centroids)
 
-    # Шаг 3: однократное распределение
     labels = []
     for city in cities_list:
         dists = [distance(city, c) for c in centroids]
@@ -74,22 +65,16 @@ def algorithmic_clustering(cities, K):
 
 
 def kmeans_clustering(cities, K, max_iters=100, tol=1e-4):
-    """
-    Классический K-средних со случайной инициализацией (ручная реализация).
-    """
+    """Классический K-средних со случайной инициализацией (ручная реализация)."""
     centroids = np.array(random.sample(cities, K))
     cities = np.array(cities)
     labels = np.zeros(len(cities), dtype=int)
-
     iterations = 0
     for _ in range(max_iters):
         iterations += 1
-        # Шаг назначения
         for i, city in enumerate(cities):
             dists = [distance(city, c) for c in centroids]
             labels[i] = np.argmin(dists)
-
-        # Шаг обновления центроидов
         new_centroids = []
         for k in range(K):
             cluster_points = cities[labels == k]
@@ -98,72 +83,59 @@ def kmeans_clustering(cities, K, max_iters=100, tol=1e-4):
             else:
                 new_centroids.append(centroids[k])
         new_centroids = np.array(new_centroids)
-
         if np.allclose(new_centroids, centroids, atol=tol):
             break
         centroids = new_centroids
-
     return labels, centroids, iterations
 
 
 def sklearn_kmeans_clustering(cities, K):
-    """
-    Использует реализацию KMeans из библиотеки scikit-learn.
-    Инициализация по умолчанию – k-means++.
-    Возвращает метки, центроиды и количество итераций.
-    """
+    """Использует реализацию KMeans из scikit-learn."""
     cities_array = np.array(cities)
     kmeans = KMeans(n_clusters=K, random_state=42, n_init=10)
     kmeans.fit(cities_array)
-    labels = kmeans.labels_
-    centroids = kmeans.cluster_centers_
-    iterations = kmeans.n_iter_
-    return labels, centroids, iterations
-
+    return kmeans.labels_, kmeans.cluster_centers_, kmeans.n_iter_
 
 
 # Запуск одного теста (три метода)
-
 def run_test(cities, K, test_name):
     print(f"\n{'=' * 60}")
     print(f"{test_name}")
     print(f"Количество городов: {len(cities)}, K = {K}")
     print('=' * 60)
 
-    # 1. Алгоритмическое решение (один проход)
+    # Алгоритмическое решение
     start = time.perf_counter()
     labels_algo, centroids_algo = algorithmic_clustering(cities, K)
     time_algo = time.perf_counter() - start
     wcss_algo = compute_wcss(cities, labels_algo, centroids_algo)
 
-    # 2. Ручная реализация K-средних (случайная инициализация)
+    # Ручной K-средних
     start = time.perf_counter()
     labels_kmeans, centroids_kmeans, iter_kmeans = kmeans_clustering(cities, K)
     time_kmeans = time.perf_counter() - start
     wcss_kmeans = compute_wcss(cities, labels_kmeans, centroids_kmeans)
 
-    # 3. Sklearn KMeans (k-means++ инициализация)
+    # Sklearn KMeans
     start = time.perf_counter()
     labels_sk, centroids_sk, iter_sk = sklearn_kmeans_clustering(cities, K)
     time_sk = time.perf_counter() - start
     wcss_sk = compute_wcss(cities, labels_sk, centroids_sk)
 
-    # Вывод результатов
+    # Вывод таблицы
     print("\n{:<35} {:>12} {:>12} {:>15}".format("Метод", "Время (с)", "WCSS", "Итерации"))
     print("-" * 75)
     print("{:<35} {:>12.6f} {:>12.2f} {:>15}".format("Алгоритмический (1 проход)", time_algo, wcss_algo, "—"))
     print("{:<35} {:>12.6f} {:>12.2f} {:>15}".format("Ручной K-средних (случ. иниц.)", time_kmeans, wcss_kmeans, iter_kmeans))
     print("{:<35} {:>12.6f} {:>12.2f} {:>15}".format("Sklearn KMeans (k-means++)", time_sk, wcss_sk, iter_sk))
 
-    # Визуализация (три подграфика)
+    # Визуализация
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
     fig.suptitle(test_name, fontsize=16)
 
-    # Цвета для кластеров
     cmap = plt.cm.tab10
     colors = [cmap(i / K) for i in range(K)]
 
-    # Данные для каждого метода
     methods_data = [
         (labels_algo, centroids_algo, "Алгоритмическое (один проход)"),
         (labels_kmeans, centroids_kmeans, f"Ручной K-средних\n{iter_kmeans} итер."),
@@ -186,11 +158,58 @@ def run_test(cities, K, test_name):
     plt.show()
 
 
+def elbow_method(cities, max_K=10):
+    """Строит график зависимости WCSS от K."""
+    wcss = []
+    K_range = range(1, max_K + 1)
+    for k in K_range:
+        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+        kmeans.fit(np.array(cities))
+        wcss.append(kmeans.inertia_)
 
-# Основная программа – автоматический прогон трёх тестов
+    plt.figure(figsize=(8, 5))
+    plt.plot(K_range, wcss, 'bo-')
+    plt.xlabel('Количество кластеров K')
+    plt.ylabel('WCSS')
+    plt.title('Метод локтя для выбора K')
+    plt.grid(True)
+    plt.show()
+    return wcss, K_range
+
+
+def find_optimal_k(cities, max_K=10):
+    """
+    Определяет оптимальное число кластеров методом локтя (максимальное расстояние до прямой).
+    Возвращает оптимальное K.
+    """
+    wcss = []
+    K_range = range(1, max_K + 1)
+    for k in K_range:
+        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+        kmeans.fit(np.array(cities))
+        wcss.append(kmeans.inertia_)
+
+    # Прямая между первой и последней точками
+    first_point = (1, wcss[0])
+    last_point = (max_K, wcss[-1])
+    max_dist = -1
+    optimal_k = 1
+    for i, k in enumerate(K_range, start=1):
+        x0, y0 = k, wcss[i-1]
+        x1, y1 = first_point
+        x2, y2 = last_point
+        # Расстояние от точки до прямой через две точки
+        area = abs((x2 - x1) * (y1 - y0) - (x1 - x0) * (y2 - y1))
+        base = np.hypot(x2 - x1, y2 - y1)
+        dist = area / base if base != 0 else 0
+        if dist > max_dist:
+            max_dist = dist
+            optimal_k = k
+    return optimal_k
+
 
 def main():
-    # Задаём тестовые наборы
+    # Тестовые наборы
     tests = [
         {
             'name': 'Тест 1: Случайные города',
@@ -213,20 +232,18 @@ def main():
         },
         {
             'name': 'Тест 4 (белый ящик): Все точки одинаковы',
-            'cities': [(5, 5)] * 10,  # 10 точек в (5,5)
+            'cities': [(5, 5)] * 10,
             'K': 2
         },
         {
             'name': 'Тест 5 (белый ящик): Пустой кластер после инициализации',
             'cities': [(0, 0), (1, 0), (0, 1), (1, 1), (10, 10)],
-            'K': 3  # третий кластер может оказаться пустым
+            'K': 3
         },
         {
             'name': 'Тест 6 (чёрный ящик): Пересекающиеся кластеры',
             'cities': [
-                # кластер 1
                 (2, 2), (3, 2), (2, 3), (3, 3),
-                # кластер 2 (перекрывается)
                 (2.5, 2.5), (3.5, 2.5), (2.5, 3.5), (3.5, 3.5)
             ],
             'K': 2
@@ -234,10 +251,8 @@ def main():
         {
             'name': 'Тест 7 (чёрный ящик): Кластеры разной плотности',
             'cities': [
-                # плотный кластер (10 точек в малой области)
                 (0, 0), (0.1, 0), (0, 0.1), (0.1, 0.1), (0.2, 0),
                 (0, 0.2), (0.2, 0.2), (0.3, 0.1), (0.1, 0.3), (0.3, 0.3),
-                # разреженный кластер (4 точки на большом расстоянии)
                 (8, 8), (9, 9), (8, 9), (9, 8)
             ],
             'K': 2
@@ -245,10 +260,8 @@ def main():
         {
             'name': 'Тест 8 (чёрный ящик): Кластеры + шум',
             'cities': [
-                # два компактных кластера
                 (0, 0), (1, 0), (0, 1), (1, 1),
                 (5, 5), (6, 5), (5, 6), (6, 6),
-                # шумовые точки, равномерно разбросанные
                 (2, 2), (3, 4), (4, 2), (3, 3), (7, 2), (8, 3)
             ],
             'K': 2
@@ -263,37 +276,20 @@ def main():
             'cities': [tuple(pt) for pt in make_blobs(n_samples=100, centers=3, cluster_std=1.5, random_state=42)[0]],
             'K': 3
         }
-
     ]
 
-    # Последовательно выполняем все тесты
+    # Выполняем все тесты
     for test in tests:
         run_test(test['cities'], test['K'], test['name'])
+
+    # Демонстрация метода локтя и автоматическое определение оптимального K
     print("\nДемонстрация метода локтя для набора 'Тест 10'")
     elbow_method(tests[-1]['cities'], max_K=10)
+    optimal_k = find_optimal_k(tests[-1]['cities'], max_K=10)
+    print(f"Оптимальное число кластеров по методу локтя: {optimal_k}")
 
-
-def elbow_method(cities, max_K=10):
-    """
-    Строит график зависимости WCSS от K для ручного K-средних (можно и для sklearn).
-    """
-    wcss = []
-    K_range = range(1, max_K + 1)
-    for k in K_range:
-        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-        kmeans.fit(np.array(cities))
-        wcss.append(kmeans.inertia_)
-
-    plt.figure(figsize=(8, 5))
-    plt.plot(K_range, wcss, 'bo-')
-    plt.xlabel('Количество кластеров K')
-    plt.ylabel('WCSS')
-    plt.title('Метод локтя для выбора K')
-    plt.grid(True)
-    plt.show()
 
 if __name__ == "__main__":
-    # Фиксируем seed для воспроизводимости
     random.seed(42)
     np.random.seed(42)
     main()
