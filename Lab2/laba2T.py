@@ -64,35 +64,51 @@ def algorithmic_clustering(cities, K):
     return np.array(labels), centroids
 
 
-def kmeans_clustering(cities, K, max_iters=100, tol=1e-4):
-    """Классический K-средних со случайной инициализацией (ручная реализация)."""
-    centroids = np.array(random.sample(cities, K))
-    cities = np.array(cities)
-    labels = np.zeros(len(cities), dtype=int)
-    iterations = 0
-    for _ in range(max_iters):
-        iterations += 1
-        for i, city in enumerate(cities):
-            dists = [distance(city, c) for c in centroids]
-            labels[i] = np.argmin(dists)
-        new_centroids = []
-        for k in range(K):
-            cluster_points = cities[labels == k]
-            if len(cluster_points) > 0:
-                new_centroids.append(np.mean(cluster_points, axis=0))
-            else:
-                new_centroids.append(centroids[k])
-        new_centroids = np.array(new_centroids)
-        if np.allclose(new_centroids, centroids, atol=tol):
-            break
-        centroids = new_centroids
-    return labels, centroids, iterations
+def kmeans_clustering(cities, K, max_iters=100, tol=1e-4, n_init=10):
+    """Классический K-средних со случайной инициализацией и многократными запусками."""
+    best_labels = None
+    best_centroids = None
+    best_iterations = 0
+    best_wcss = float('inf')
+
+    for _ in range(n_init):
+        # Случайная инициализация
+        centroids = np.array(random.sample(cities, K))
+        cities_arr = np.array(cities)
+        labels = np.zeros(len(cities_arr), dtype=int)
+        iterations = 0
+        for _ in range(max_iters):
+            iterations += 1
+            for i, city in enumerate(cities_arr):
+                dists = [distance(city, c) for c in centroids]
+                labels[i] = np.argmin(dists)
+            new_centroids = []
+            for k in range(K):
+                cluster_points = cities_arr[labels == k]
+                if len(cluster_points) > 0:
+                    new_centroids.append(np.mean(cluster_points, axis=0))
+                else:
+                    new_centroids.append(centroids[k])
+            new_centroids = np.array(new_centroids)
+            if np.allclose(new_centroids, centroids, atol=tol):
+                break
+            centroids = new_centroids
+
+        # Вычисляем WCSS для этого запуска
+        wcss = compute_wcss(cities, labels, centroids)
+        if wcss < best_wcss:
+            best_wcss = wcss
+            best_labels = labels
+            best_centroids = centroids
+            best_iterations = iterations
+
+    return best_labels, best_centroids, best_iterations
 
 
 def sklearn_kmeans_clustering(cities, K):
     """Использует реализацию KMeans из scikit-learn."""
     cities_array = np.array(cities)
-    kmeans = KMeans(n_clusters=K, random_state=42, n_init=10)
+    kmeans = KMeans(n_clusters=K,init='k-means++', random_state=42, n_init=10)
     kmeans.fit(cities_array)
     return kmeans.labels_, kmeans.cluster_centers_, kmeans.n_iter_
 
@@ -163,7 +179,7 @@ def elbow_method(cities, max_K=10):
     wcss = []
     K_range = range(1, max_K + 1)
     for k in K_range:
-        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+        kmeans = KMeans(n_clusters=k,init='k-means++', random_state=42, n_init=10)
         kmeans.fit(np.array(cities))
         wcss.append(kmeans.inertia_)
 
@@ -185,7 +201,7 @@ def find_optimal_k(cities, max_K=10):
     wcss = []
     K_range = range(1, max_K + 1)
     for k in K_range:
-        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+        kmeans = KMeans(n_clusters=k,init='k-means++', random_state=42, n_init=10)
         kmeans.fit(np.array(cities))
         wcss.append(kmeans.inertia_)
 
