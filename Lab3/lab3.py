@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score
 from sklearn.model_selection import LeaveOneOut
 from typing import List, Union, Tuple, Dict
 import warnings
-
+import time
+from sklearn.metrics import confusion_matrix, f1_score, accuracy_score
 warnings.filterwarnings('ignore')
 
 
@@ -255,24 +255,60 @@ print("=" * 60)
 
 def perform_loocv(X, y, k=3):
     loo = LeaveOneOut()
-    custom_correct = 0
-    sklearn_correct = 0
     n_splits = loo.get_n_splits(X)
+
+    # Для сбора истинных и предсказанных меток
+    y_true_custom = []
+    y_pred_custom = []
+    y_true_sklearn = []
+    y_pred_sklearn = []
+
+    # ----- Custom k-NN -----
+    start_custom = time.perf_counter()
     for train_index, test_index in loo.split(X):
         X_train, X_test = X[train_index], X[test_index]
         y_train, y_test = y[train_index], y[test_index]
         custom_model = CustomKNNClassifier(k=k).fit(X_train, y_train)
-        if custom_model.predict(X_test)[0] == y_test[0]:
-            custom_correct += 1
-        sklearn_model = KNeighborsClassifier(n_neighbors=k).fit(X_train, y_train)
-        if sklearn_model.predict(X_test)[0] == y_test[0]:
-            sklearn_correct += 1
-    custom_accuracy = custom_correct / n_splits
-    sklearn_accuracy = sklearn_correct / n_splits
-    print(f"Точность Custom k-NN (LOOCV, k={k}): {custom_accuracy * 100:.1f}%")
-    print(f"Точность Sklearn k-NN (LOOCV, k={k}): {sklearn_accuracy * 100:.1f}%")
-    print(f"Модели работают идентично: {custom_accuracy == sklearn_accuracy}")
+        pred = custom_model.predict(X_test)[0]
+        y_true_custom.append(y_test[0])
+        y_pred_custom.append(pred)
+    time_custom = time.perf_counter() - start_custom
 
+    # ----- Sklearn k-NN -----
+    start_sklearn = time.perf_counter()
+    for train_index, test_index in loo.split(X):
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+        sklearn_model = KNeighborsClassifier(n_neighbors=k).fit(X_train, y_train)
+        pred = sklearn_model.predict(X_test)[0]
+        y_true_sklearn.append(y_test[0])
+        y_pred_sklearn.append(pred)
+    time_sklearn = time.perf_counter() - start_sklearn
+
+    # Расчёт метрик
+    acc_custom = accuracy_score(y_true_custom, y_pred_custom)
+    f1_custom = f1_score(y_true_custom, y_pred_custom, average='weighted')
+    cm_custom = confusion_matrix(y_true_custom, y_pred_custom, labels=np.unique(y))
+
+    acc_sklearn = accuracy_score(y_true_sklearn, y_pred_sklearn)
+    f1_sklearn = f1_score(y_true_sklearn, y_pred_sklearn, average='weighted')
+    cm_sklearn = confusion_matrix(y_true_sklearn, y_pred_sklearn, labels=np.unique(y))
+
+    # Вывод результатов
+    print(f"\nCustom k-NN LOOCV (k={k}):")
+    print(f"  Accuracy  = {acc_custom:.3f} ({acc_custom*100:.1f}%)")
+    print(f"  F1-weight = {f1_custom:.3f}")
+    print(f"  Время     = {time_custom:.4f} с")
+    print("  Матрица ошибок:")
+    print(pd.DataFrame(cm_custom, index=np.unique(y), columns=np.unique(y)))
+
+    print(f"\nSklearn k-NN LOOCV (k={k}):")
+    print(f"  Accuracy  = {acc_sklearn:.3f} ({acc_sklearn*100:.1f}%)")
+    print(f"  F1-weight = {f1_sklearn:.3f}")
+    print(f"  Время     = {time_sklearn:.4f} с")
+    print("  Матрица ошибок:")
+    print(pd.DataFrame(cm_sklearn, index=np.unique(y), columns=np.unique(y)))
+    
 perform_loocv(X, y, k=3)
 
 print("\n" + "=" * 60)
