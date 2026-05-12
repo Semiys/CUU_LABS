@@ -215,7 +215,7 @@ print("Confusion matrix:\n", confusion_matrix(y_test, y_pred_raw))
 print("ROC-AUC:", roc_auc_score(y_test, y_proba_raw))
 
 
-# учная реализация дерева решений (на сырых данных)
+# ручная реализация дерева решений (на сырых данных)
 custom_tree = CustomDecisionTreeClassifier(max_depth=10, min_samples_split=2, criterion='gini', random_state=42)
 custom_tree.fit(X_train, y_train)
 y_pred_custom = custom_tree.predict(X_test)
